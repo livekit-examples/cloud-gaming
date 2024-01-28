@@ -31,11 +31,11 @@ type Position struct {
 }
 
 const (
-	livekitURL      = "REMOVED<"
-	roomName        = "steam-test"
-	apiKey          = "REMOVED<"
-	apiSecret       = "REMOVED<"
-	participantName = "key-listener"
+	livekitURL      = ""
+	roomName        = ""
+	apiKey          = ""
+	apiSecret       = ""
+	participantName = ""
 )
 
 var keyMap = map[string]int{
