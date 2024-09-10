@@ -4,7 +4,7 @@ import {
   PreJoin,
   LocalUserChoices,
   useToken,
-  VideoConference,
+  //VideoConference,
   formatChatMessageLinks,
 } from '@livekit/components-react';
 import {
@@ -16,6 +16,8 @@ import {
   VideoPresets,
   DataPacket_Kind,
 } from 'livekit-client';
+
+import {VideoConference} from './myvideoconference';
 
 import type { NextPage } from 'next';
 import Head from 'next/head';
@@ -263,6 +265,7 @@ const ActiveRoom = ({ roomName, userChoices, onLeave }: ActiveRoomProps) => {
 
     window.addEventListener("gamepadconnected", (event) => {
       console.log("A gamepad was connected:", event.gamepad);
+      checkGamepad(); // Start the gamepad polling loop
   });
   
   window.addEventListener("gamepaddisconnected", (event) => {
@@ -270,51 +273,71 @@ const ActiveRoom = ({ roomName, userChoices, onLeave }: ActiveRoomProps) => {
   });
     
 
-    // Gamepad handling code
-    const checkGamepad = () => {
-      const gamepads = navigator.getGamepads();
-      if (!gamepads[0]) return; // No gamepad detected
-  
-      const gamepad = gamepads[0];
-  
-      // Loop through buttons and check if any are pressed
-      for (let i = 0; i < gamepad.buttons.length; i++) {
-        if (gamepad.buttons[i].pressed) {
-          if (room && room.localParticipant) {
-            const eventData = {
-              type: 'gamepadButton',
-              buttonIndex: i,
-            };
-            console.log(eventData);
-            const strData = JSON.stringify(eventData);
-            const data = encoder.encode(strData);
-            room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
-          }
-        }
-      }
-  
-      // Send joystick axes values if they are being moved
-      if (
-        Math.abs(gamepad.axes[0]) > 0.2 || Math.abs(gamepad.axes[1]) > 0.2 ||
-        Math.abs(gamepad.axes[2]) > 0.2 || Math.abs(gamepad.axes[3]) > 0.2
-      ) {
-        if (room && room.localParticipant) {
-          const eventData = {
-            type: 'gamepadAxes',
-            leftAxes: [gamepad.axes[0], gamepad.axes[1]],  // Left joystick
-            rightAxes: [gamepad.axes[2], gamepad.axes[3]], // Right joystick
-          };
+// Track the state of the buttons from the previous frame
+let previousButtonStates: boolean[] = [];
 
-          const strData = JSON.stringify(eventData);
-          const data = encoder.encode(strData);
-          room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
-        }
-      }
-  
-      requestAnimationFrame(checkGamepad);
+// Gamepad handling code
+const checkGamepad = () => {
+  const gamepads = navigator.getGamepads();
+  if (!gamepads[0]) return;
+
+  const gamepad = gamepads[0];
+
+  if (previousButtonStates.length === 0) {
+    previousButtonStates = gamepad.buttons.map(button => button.pressed);
+  }
+
+  for (let i = 0; i < gamepad.buttons.length; i++) {
+    const isPressed = gamepad.buttons[i].pressed;
+    const wasPressed = previousButtonStates[i];
+
+    if (isPressed && !wasPressed) {
+      handleGamepadButtonEvent('keydown', i);
+    } else if (!isPressed && wasPressed) {
+      handleGamepadButtonEvent('keyup', i);
+    }
+
+    previousButtonStates[i] = isPressed;
+  }
+
+  // Send joystick axes values if they are being moved
+  if (
+    Math.abs(gamepad.axes[0]) > 0.2 || Math.abs(gamepad.axes[1]) > 0.2 ||
+    Math.abs(gamepad.axes[2]) > 0.2 || Math.abs(gamepad.axes[3]) > 0.2
+  ) {
+    if (room && room.localParticipant) {
+      const eventData = {
+        type: 'gamepadAxes',
+        leftAxes: [gamepad.axes[0], gamepad.axes[1]],  // Left joystick
+        rightAxes: [gamepad.axes[2], gamepad.axes[3]], // Right joystick
+      };
+
+      console.log(eventData);
+      const strData = JSON.stringify(eventData);
+      const data = encoder.encode(strData);
+      room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+    }
+  }
+
+  requestAnimationFrame(checkGamepad);
+};
+
+const handleGamepadButtonEvent = (eventType: string, buttonIndex: number) => {
+  if (room && room.localParticipant) {
+    const eventData = {
+      type: eventType === 'keydown' ? 'gamepadButtonDown' : 'gamepadButtonUp',
+      buttonIndex: buttonIndex,
     };
-  
-    checkGamepad(); // Start the gamepad polling loop
+    console.log(eventData);
+    const strData = JSON.stringify(eventData);
+    const data = encoder.encode(strData);
+    room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+  }
+};
+
+// Start the gamepad loop
+requestAnimationFrame(checkGamepad);
+
 
     return () => {
       window.removeEventListener('mousedown', handleMouseClick);
@@ -339,12 +362,6 @@ const ActiveRoom = ({ roomName, userChoices, onLeave }: ActiveRoomProps) => {
     if (document.body.requestPointerLock) {
       document.body.requestPointerLock();
     }
-    // You may need to handle promises and potential errors here
-    /*if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().then(() => {
-
-      });
-    }*/
   };
 
   return (
@@ -367,5 +384,3 @@ const ActiveRoom = ({ roomName, userChoices, onLeave }: ActiveRoomProps) => {
     </>
   );
 };
-
-

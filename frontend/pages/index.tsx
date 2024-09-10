@@ -40,7 +40,7 @@ function Tabs(props: TabsProps) {
 function DemoMeetingTab({ label }: { label: string }) {
   const router = useRouter();
   const startMeeting = () => {
-    router.push(`/rooms/${generateRoomId()}`);
+    router.push(`/rooms/steam-test`);
   };
   return (
     <div className={styles.tabContent}>
