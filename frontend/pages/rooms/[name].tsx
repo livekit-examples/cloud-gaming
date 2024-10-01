@@ -174,7 +174,11 @@ const ActiveRoom = ({ roomName, userChoices, onLeave }: ActiveRoomProps) => {
         };
         const strData = JSON.stringify(eventData);
         const data = encoder.encode(strData);
-        room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+        try {
+            room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+	} catch (error) {
+	    console.error('Error publishing data:', error);
+	}
       }
     };
 
@@ -194,7 +198,11 @@ const ActiveRoom = ({ roomName, userChoices, onLeave }: ActiveRoomProps) => {
         };
         const strData = JSON.stringify(eventData);
         const data = encoder.encode(strData);
-        room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+        try {
+            room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+	} catch (error) {
+	    console.error('Error publishing data:', error);
+	}
       }
     };
 
@@ -210,7 +218,11 @@ const ActiveRoom = ({ roomName, userChoices, onLeave }: ActiveRoomProps) => {
         };
         const strData = JSON.stringify(eventData);
         const data = encoder.encode(strData);
-        room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+        try {
+            room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+	} catch (error) {
+	    console.error('Error publishing data:', error);
+	}
       }
     };
 
@@ -239,7 +251,11 @@ const ActiveRoom = ({ roomName, userChoices, onLeave }: ActiveRoomProps) => {
       
         const strData = JSON.stringify(eventData);
         const encodedData = encoder.encode(strData);
-        room.localParticipant.publishData(encodedData, DataPacket_Kind.LOSSY);
+        try {
+            room.localParticipant.publishData(encodedData, DataPacket_Kind.LOSSY);
+	} catch (error) {
+	    console.error('Error publishing data:', error);
+	}
       }
     }
 
@@ -248,13 +264,17 @@ const ActiveRoom = ({ roomName, userChoices, onLeave }: ActiveRoomProps) => {
         
         const eventData = {
           type: 'mousewheel',
-          deltaX: event.deltaX,
-          deltaY: event.deltaY,
+          deltaX: Math.round(event.deltaX),
+          deltaY: Math.round(event.deltaY),
         };
 
         const strData = JSON.stringify(eventData);
         const encodedData = encoder.encode(strData);
-        room.localParticipant.publishData(encodedData, DataPacket_Kind.LOSSY);
+        try {
+            room.localParticipant.publishData(encodedData, DataPacket_Kind.LOSSY);
+	} catch (error) {
+	    console.error('Error publishing data:', error);
+	}
     }
 
     window.addEventListener('mousedown', handleMouseClick);
@@ -302,8 +322,8 @@ const checkGamepad = () => {
 
   // Send joystick axes values if they are being moved
   if (
-    Math.abs(gamepad.axes[0]) > 0.2 || Math.abs(gamepad.axes[1]) > 0.2 ||
-    Math.abs(gamepad.axes[2]) > 0.2 || Math.abs(gamepad.axes[3]) > 0.2
+    Math.abs(gamepad.axes[0]) > 0.012 || Math.abs(gamepad.axes[1]) > 0.012 ||
+    Math.abs(gamepad.axes[2]) > 0.012 || Math.abs(gamepad.axes[3]) > 0.012
   ) {
     if (room && room.localParticipant) {
       const eventData = {
@@ -312,10 +332,13 @@ const checkGamepad = () => {
         rightAxes: [gamepad.axes[2], gamepad.axes[3]], // Right joystick
       };
 
-      console.log(eventData);
       const strData = JSON.stringify(eventData);
       const data = encoder.encode(strData);
-      room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+      try {
+          room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+      } catch (error) {
+          console.error('Error publishing data:', error);
+      }
     }
   }
 
@@ -331,7 +354,11 @@ const handleGamepadButtonEvent = (eventType: string, buttonIndex: number) => {
     console.log(eventData);
     const strData = JSON.stringify(eventData);
     const data = encoder.encode(strData);
-    room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+    try {    
+        room.localParticipant.publishData(data, DataPacket_Kind.LOSSY);
+    } catch (error) {
+        console.error('Error publishing data:', error);
+    }
   }
 };
 

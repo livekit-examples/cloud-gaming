@@ -1,3 +1,62 @@
+# Builder Stage
+FROM debian:bookworm-slim AS builder
+
+# Set environment variables
+ARG DEBIAN_FRONTEND=noninteractive
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
+ENV PATH="/root/.cargo/bin:${PATH}"
+ENV DEBUG=false
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    build-essential \
+    curl \
+    wget \
+    git \
+    golang \
+    libssl-dev \
+    python3 \
+    python3-pip \
+    python3-setuptools \
+    ninja-build \
+    pkg-config \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    libgstreamer-plugins-bad1.0-dev \
+    gstreamer1.0-tools
+
+RUN git clone https://github.com/mesonbuild/meson.git /meson \
+    && cd /meson \
+    && python3 setup.py install \
+    && cd / \
+    && rm -rf /meson
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+RUN cargo install cargo-c
+
+# Download gst-plugins-rs
+RUN wget https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs/-/archive/gstreamer-1.24.3/gst-plugins-rs-gstreamer-1.24.3.tar.gz \
+    && tar xfz gst-plugins-rs-gstreamer-1.24.3.tar.gz \
+    && rm gst-plugins-rs-gstreamer-1.24.3.tar.gz \
+    && mv gst-plugins-rs-gstreamer-1.24.3 gst-plugins-rs
+
+WORKDIR /gst-plugins-rs
+# Remove unsported section
+RUN sed -i '3553,3564d' net/webrtc/src/webrtcsink/imp.rs
+
+COPY input-handler /input-handler
+WORKDIR /input-handler
+RUN go build -o input-handler
+
+WORKDIR /
+COPY compile-rs.sh /
+RUN /compile-rs.sh 
+
 FROM debian:bookworm-slim
 
 # Update package repos
@@ -111,7 +170,7 @@ ENV \
     USER="default" \
     USER_PASSWORD="password" \
     USER_HOME="/home/default" \
-    TZ="Pacific/Auckland" \
+    TZ="America/Los_Angeles" \
     USER_LOCALES="en_US.UTF-8 UTF-8"
 RUN \
     echo "**** Configure default user '${USER}' ****" \
@@ -381,17 +440,6 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     pkg-config
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 
-
-RUN git clone https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs.git
-
-WORKDIR /gst-plugins-rs
-
-RUN /root/.cargo/bin/cargo install cargo-c
-RUN /root/.cargo/bin/cargo cbuild -p gst-plugin-webrtc
-RUN /root/.cargo/bin/cargo cbuild -p gst-plugin-rtp
-
-
 # Install tools for monitoring hardware
 RUN \
     echo "**** Update apt database ****" \
@@ -459,10 +507,13 @@ RUN \
 COPY steam-headless/overlay /
 
 # Add input-handler
-COPY input-handler /input-handler
-WORKDIR /input-handler
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /usr/bin/input-handler
-WORKDIR /
+COPY --from=builder /input-handler/input-handler /usr/bin/input-handler
+
+# Copy built plugins from builder stage
+#COPY --from=builder /gst-plugins-rs/target/x86_64-unknown-linux-gnu/*.so /usr/lib/x86_64-linux-gnu/gstreamer-1.0/
+RUN mkdir /compiled-binaries
+COPY --from=builder /compiled-binaries/* /compiled-binaries/
+RUN cp /compiled-binaries/lib/x86_64-linux-gnu/gstreamer-1.0/libgst* /usr/lib/x86_64-linux-gnu/gstreamer-1.0/
 
 # Set display environment variables
 ENV \
@@ -479,21 +530,12 @@ ENV \
 # Set container configuration environment variables
 ENV \
     MODE="primary" \
-    WEB_UI_MODE="vnc" \
-    ENABLE_VNC_AUDIO="true" \
     ENABLE_STEAM="true" \
     STEAM_ARGS="-silent" \
-    ENABLE_SUNSHINE="true" \
     ENABLE_EVDEV_INPUTS="true" \
     ENABLE_WOL_POWER_MANAGER="false"
-
-# Configure required ports
-ENV \
-    PORT_NOVNC_WEB="8083"
-
-# Expose the required ports
-EXPOSE 8083
 
 # Set entrypoint
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
+

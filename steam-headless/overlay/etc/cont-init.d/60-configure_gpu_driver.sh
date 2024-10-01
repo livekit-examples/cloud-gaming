@@ -42,10 +42,10 @@ function download_driver {
 
         mv /tmp/NVIDIA.run "${USER_HOME:?}/Downloads/NVIDIA_${nvidia_host_driver_version:?}.run"
 
-        print_step_header "Downloading CUDA v12.2"
+        print_step_header "Downloading CUDA v12.6"
         wget -q --show-progress --progress=bar:force:noscroll \
             -O /tmp/cuda.run \
-            "https://developer.download.nvidia.com/compute/cuda/12.2.0/local_installers/cuda_12.2.0_510.39.01_linux.run"
+	    "https://developer.download.nvidia.com/compute/cuda/12.6.1/local_installers/cuda_12.6.1_560.35.03_linux.run"
         [[ $? -gt 0 ]] && print_error "Unable to download CUDA. Exit!" && return 1
 
         mv /tmp/cuda.run "${USER_HOME:?}/Downloads/cuda.run"
@@ -81,14 +81,14 @@ function install_nvidia_driver {
                 --no-install-libglvnd \
                 > "${USER_HOME:?}/Downloads/nvidia_gpu_install.log" 2>&1
 
-            print_step_header "Installing CUDA v12.2"
+            print_step_header "Installing CUDA v12.6"
             chmod +x "${USER_HOME:?}/Downloads/cuda.run"
             "${USER_HOME:?}/Downloads/cuda.run" \
                 --toolkit \
                 --silent
 
-            echo "export PATH=/usr/local/cuda-12.2/bin:${PATH}" >> ~/.bashrc
-            echo "export LD_LIBRARY_PATH=/usr/local/cuda-12.2/lib64:${LD_LIBRARY_PATH}" >> ~/.bashrc
+            echo "export PATH=/usr/local/cuda-12.6/bin:${PATH}" >> ~/.bashrc
+            echo "export LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:${LD_LIBRARY_PATH}" >> ~/.bashrc
 
         else 
             print_step_header "Installing Legacy NVIDIA driver v${nvidia_host_driver_version:?} to match what is running on the host"
@@ -160,17 +160,20 @@ function patch_nvidia_driver {
 
 function install_deb_mesa {
     if [ ! -f /tmp/init-mesa-libs-install.log ]; then
-        print_step_header "Enable i386 arch"
+        print_step_header "Enable i386 architecture"
         dpkg --add-architecture i386
-        print_step_header "Add Debian SID sources"
-        echo "deb http://deb.debian.org/debian/ sid main" > /etc/apt/sources.list
         apt-get update &>> /tmp/init-mesa-libs-install.log
-        print_step_header "Install mesa vulkan drivers"
+
+        print_step_header "Add Debian Bookworm Backports sources"
+        echo "deb http://deb.debian.org/debian bookworm-backports main contrib non-free non-free-firmware" > /etc/apt/sources.list.d/backports.list
+        apt-get update &>> /tmp/init-mesa-libs-install.log
+
+        print_step_header "Install Mesa Vulkan drivers from backports"
         echo "" >> /tmp/init-mesa-libs-install.log
-        apt-get install -y --no-install-recommends \
-            libvulkan1 \
+        apt-get install -y -t bookworm-backports \
+            libvulkan1:amd64 \
             libvulkan1:i386 \
-            mesa-vulkan-drivers \
+            mesa-vulkan-drivers:amd64 \
             mesa-vulkan-drivers:i386 \
             mesa-utils \
             mesa-utils-extra \

@@ -1,11 +1,13 @@
 module github.com/livekit/cloud-gaming/input-handler
 
-go 1.21.0
-
-require github.com/livekit/server-sdk-go v1.0.16
+go 1.23
 
 require (
-	github.com/bendahl/uinput v1.6.2
+	github.com/livekit/server-sdk-go v1.0.16
+	github.com/real-danm/uinput v0.0.0-20240906050710-cd612577288b
+)
+
+require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect

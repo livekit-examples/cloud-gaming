@@ -28,6 +28,46 @@ if [ -f "${USER_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/displays.xml" ]; 
     fi
 fi
 
+function append_input_devices_to_xorg_conf {
+    print_step_header "Appending InputDevice sections to xorg.conf"
+
+    # Identify the correct event numbers for keyboard, mouse, and gamepad
+    keyboard_event=$(grep -E 'Handlers|Name=' /proc/bus/input/devices | grep -B1 'Name="keyboard0"' | grep -Eo 'event[0-9]+' | head -1)
+    mouse_event=$(grep -E 'Handlers|Name=' /proc/bus/input/devices | grep -B1 'Name="mouse0"' | grep -Eo 'event[0-9]+' | head -1)
+    gamepad_event=$(grep -E 'Handlers|Name=' /proc/bus/input/devices | grep -B1 'Name="gamepad0"' | grep -Eo 'event[0-9]+' | head -1)
+
+    # Default to event4, event5, event6 if detection fails
+    keyboard_event=${keyboard_event:-event4}
+    mouse_event=${mouse_event:-event5}
+    gamepad_event=${gamepad_event:-event6}
+
+    cat <<EOF | tee -a /etc/X11/xorg.conf > /dev/null
+
+Section "InputDevice"
+    Identifier     "Keyboard0"
+    Driver         "evdev"
+    Option         "Device" "/dev/input/${keyboard_event}"
+    Option         "AutoServerLayout" "on"
+EndSection
+
+Section "InputDevice"
+    Identifier     "Mouse0"
+    Driver         "evdev"
+    Option         "Device" "/dev/input/${mouse_event}"
+    Option         "AutoServerLayout" "on"
+EndSection
+
+Section "InputDevice"
+    Identifier     "MyGamepad"
+    Driver         "evdev"
+    Option         "Device" "/dev/input/${gamepad_event}"
+    Option         "Name" "Gamepad"
+EndSection
+
+EOF
+}
+
+
 # Configure a NVIDIA X11 config
 function configure_nvidia_x_server {
     print_step_header "Configuring X11 with GPU ID: '${gpu_select}'"
@@ -42,13 +82,16 @@ function configure_nvidia_x_server {
     if [[ "X${DISPLAY_VIDEO_PORT:-}" != "X" ]]; then
         connected_monitor="--connected-monitor=${DISPLAY_VIDEO_PORT:?}"
     fi
-    nvidia-xconfig --virtual="${DISPLAY_SIZEW:?}x${DISPLAY_SIZEH:?}" --depth="${DISPLAY_CDEPTH:?}" --mode=$(echo "${MODELINE:?}" | awk '{print $2}' | tr -d '"') --allow-empty-initial-configuration --no-probe-all-gpus --busid="${bus_id:?}" --no-multigpu --no-sli --no-base-mosaic --only-one-x-screen ${connected_monitor:?}
+    nvidia-xconfig --virtual="${DISPLAY_SIZEW:?}x${DISPLAY_SIZEH:?}" --depth="${DISPLAY_CDEPTH:?}" --mode=$(echo "${MODELINE:?}" | awk '{print $2}' | tr -d '"') --allow-empty-initial-configuration --no-probe-all-gpus --busid="${bus_id:?}" --no-sli --no-base-mosaic --only-one-x-screen ${connected_monitor:?}
     sed -i '/Driver\s\+"nvidia"/a\    Option         "ModeValidation" "NoMaxPClkCheck, NoEdidMaxPClkCheck, NoMaxSizeCheck, NoHorizSyncCheck, NoVertRefreshCheck, NoVirtualSizeCheck, NoTotalSizeCheck, NoDualLinkDVICheck, NoDisplayPortBandwidthCheck, AllowNon3DVisionModes, AllowNonHDMI3DModes, AllowNonEdidModes, NoEdidHDMI2Check, AllowDpInterlaced"\n    Option         "HardDPMS" "False"' /etc/X11/xorg.conf
     sed -i '/Section\s\+"Monitor"/a\    '"${MODELINE}" /etc/X11/xorg.conf
     # Prevent interference between GPUs
     echo -e "Section \"ServerFlags\"\n    Option \"AutoAddGPU\" \"false\"\nEndSection" | tee -a /etc/X11/xorg.conf > /dev/null
     # Configure primary GPU
     sed -i '/Driver\s\+"nvidia"/a\    Option "AllowEmptyInitialConfiguration"\n    Option "PrimaryGPU" "yes"' /usr/share/X11/xorg.conf.d/nvidia-drm-outputclass.conf 
+
+    sed -i '/Section "InputDevice"/,/EndSection/d' /etc/X11/xorg.conf
+    append_input_devices_to_xorg_conf
 }
 
 # Allow anybody for running x server
