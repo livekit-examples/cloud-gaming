@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
-	"github.com/bendahl/uinput"
+	"github.com/real-danm/uinput"
 
 	lksdk "github.com/livekit/server-sdk-go"
 )
@@ -31,11 +32,11 @@ type Position struct {
 }
 
 const (
-	livekitURL      = ""
-	roomName        = ""
-	apiKey          = ""
-	apiSecret       = ""
-	participantName = ""
+	livekitURL      = os.Getenv("LK_ENDPOINT")
+	roomName        = os.Getenv("LK_ROOM")
+	apiKey          = os.Getenv("LK_API_KEY")
+	apiSecret       = os.Getenv("LK_SECRET_KEY")
+	participantName = "input-listener"
 )
 
 var keyMap = map[string]int{
@@ -94,6 +95,27 @@ var keyMap = map[string]int{
 	"escape":    uinput.KeyEsc,
 }
 
+var buttonMap = []int{
+	uinput.ButtonSouth,
+	uinput.ButtonWest,
+	uinput.ButtonEast,
+	uinput.ButtonNorth,
+	uinput.ButtonBumperLeft,
+	uinput.ButtonBumperRight,
+	uinput.ButtonTriggerLeft,
+	uinput.ButtonTriggerRight,
+	0, // Share button
+	0, // Option button
+	uinput.ButtonThumbLeft,
+	uinput.ButtonThumbRight,
+	uinput.ButtonDpadUp,
+	uinput.ButtonDpadDown,
+	uinput.ButtonDpadLeft,
+	uinput.ButtonDpadRight,
+	uinput.ButtonMode,
+	0, // Touchpad button (unused)
+}
+
 /*
 var (
 	lastX = 400
@@ -102,21 +124,18 @@ var (
 */
 
 func main() {
-	// Create a new uinput device
+	// Create input devices
 	device, err := uinput.CreateKeyboard("/dev/uinput", []byte("keyboard0"))
 	if err != nil {
 		log.Fatalf("Could not create uinput device: %v", err)
 		return
 	}
 	defer device.Close()
-
-	// initialize mouse and check for possible errors
 	mouse, err := uinput.CreateMouse("/dev/uinput", []byte("mouse0"))
 	if err != nil {
 		fmt.Println("Error creating mouse:", err)
 		return
 	}
-	// always do this after the initialization in order to guarantee that the device will be properly closed
 	defer mouse.Close()
 
 	gamepad, err := uinput.CreateGamepad("/dev/uinput", []byte("gamepad0"), 0xDEAD, 0xBEEF)
@@ -125,6 +144,7 @@ func main() {
 		return
 	}
 	defer gamepad.Close()
+	// end input devices
 
 	roomCB := &lksdk.RoomCallback{
 		ParticipantCallback: lksdk.ParticipantCallback{
@@ -132,6 +152,22 @@ func main() {
 				var event EventData
 				if err := json.Unmarshal(data, &event); err != nil {
 					log.Printf("Error unmarshalling data: %v", err)
+					return
+				}
+
+				if rp == nil {
+					fmt.Println("got nil participant, ignoring")
+					return
+				}
+				// check participant name to send input to correct device
+				if rp.Name() == "player1" {
+					// no op
+				} else if rp.Name() == "player2" {
+					if event.Type == "keydown" || event.Type == "keyup" || event.Type == "mousemove" || event.Type == "mousewheel" {
+						fmt.Println("Ignoring player2 non-gamepad input")
+					}
+				} else {
+					fmt.Println("Ignoring Unknown participant:", rp.Name())
 					return
 				}
 
@@ -151,13 +187,28 @@ func main() {
 				case "mousewheel":
 					// Handle mousewheel events
 					mouse.Wheel(false, int32(event.DeltaY))
-				case "gamepadButton":
-					// Handle gamepad button events
-					fmt.Println("Gamepad button:", event.Button)
-					gamepad.ButtonPress(event.ButtonIndex)
+				case "gamepadButtonUp":
+					if event.ButtonIndex == 7 {
+						//gamepad.ButtonUp(0x139)
+						gamepad.RightTriggerForce(0.0)
+					} else if event.ButtonIndex == 6 {
+						//gamepad.ButtonUp(0x138)
+						gamepad.LeftTriggerForce(0.0)
+					} else {
+						gamepad.ButtonUp(buttonMap[event.ButtonIndex])
+					}
+				case "gamepadButtonDown":
+					if event.ButtonIndex == 7 {
+						//gamepad.ButtonDown(0x139)
+						gamepad.RightTriggerForce(1.0)
+					} else if event.ButtonIndex == 6 {
+						//gamepad.ButtonDown(0x138)
+						gamepad.LeftTriggerForce(1.0)
+					} else {
+						gamepad.ButtonDown(buttonMap[event.ButtonIndex])
+					}
 				case "gamepadAxes":
 					// Handle gamepad axis events
-					fmt.Println("Gamepad axis:", event.Button)
 					left := *event.LeftStick
 					right := *event.RightStick
 					gamepad.LeftStickMove(float32(left[0]), float32(left[1]))
