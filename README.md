@@ -42,3 +42,7 @@ Section "InputDevice"
     Option "Name" "Gamepad"
 EndSection
 ```
+
+
+# SECURITY WARNING
+This is not production ready software. This code allows user input to the VM it is running on and is not secure. Do not run this and make it publicly available without understanding the security risks.
