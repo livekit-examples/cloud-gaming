@@ -1,3 +1,6 @@
+> [!WARNING]
+> This example is archived and no longer maintained. For current examples, see [LiveKit docs](https://docs.livekit.io/).
+
 ## What is this
 This is a docker container that runs headless Steam. Much of the steam-headless code is forked from https://github.com/Steam-Headless/docker-steam-headless
 - Required programs are started/kept alive with supervisord.
